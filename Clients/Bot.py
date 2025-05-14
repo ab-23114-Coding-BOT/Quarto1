@@ -4,11 +4,11 @@ import json
 import random        
 
 HOST = "0.0.0.0"     
-PORT = 9976          
-IpServeur = "172.17.91.203"
+PORT = 1234          
+IpServeur = "192.168.129.13"
 
-TEAM_NAME = "P"
-MATRICULES = ["23105", "23114"]
+TEAM_NAME = "BOTKZ"
+MATRICULES = ["23114", "23105"]
 
 ALL_PIECES = [
     "BDEC", "BDEP", "BDFC", "BDFP",
@@ -111,7 +111,7 @@ def choose_move(state): #choisir un coup valide en fonction des choix
         }
 
     if not valid_positions: #cas 2 : jouer une pièce reçue
-        return {"response": "give_up", "message": "Plus de cases disponibles"}
+        return {"response": "giveup"}
 
     for pos in valid_positions: #gagner si possible
         if creates_victory(board, pos, current_piece):
@@ -121,27 +121,35 @@ def choose_move(state): #choisir un coup valide en fonction des choix
                 "message": f"Je gagne couz !!"
             }
 
-    block_pos = blocks_opponent_win(board, current_piece) #si l'adversaire gagne on le bloque
+    block_pos = blocks_opponent_win(board, current_piece)
     if block_pos is not None:
         return {
-            "pos": block_pos,
-            "piece": None,
-            "message": f"T'as cru t'allais gagner ??"
+            "pos": block_pos, "piece": None,
+            "message": "T'as cru t'allais gagner ??"
         }
-    
-    if len(valid_positions) <= 6: #utilise minimax à la fin de la partie
-        depth = 3 if len(valid_positions) > 4 else 4
-        print(f"[MINIMAX] Activation profondeur {depth}")
-        _, best = minimax(board, current_piece, depth=depth, maximizing_player=True, alpha=float('-inf'), beta=float('inf'))
-        if best:
-            pos, next_piece = best
-            return {
-                "pos": pos,
-                "piece": next_piece,
-                "message": f"Minimax (prof. {depth}) : je joue {pos}, je donne {next_piece}"
-            }
 
-    best_pos = max(valid_positions, key=lambda pos: position_score(board, pos, current_piece)) #ou choisir une position "plutôt bonne"
+    # détection de fork : jouer toute position créant plus de 2 victoires potentielles
+    fork_moves = []
+    for pos in valid_positions:
+        sim_board = simulate_state(board, pos, current_piece)
+        if count_potential_victories(sim_board, current_piece) > 1:
+            fork_moves.append(pos)
+    if fork_moves:
+        pos0 = fork_moves[0]
+        sim = simulate_state(board, pos0, current_piece)
+        rem = get_remaining_pieces(sim, current_piece)
+        safe = [p for p in rem if not opponent_can_win(sim, p)]
+        gift = safe[0] if safe else (rem[0] if rem else None)
+        return {"pos": pos0, "piece": gift, "message": "Fork !"}
+
+    best_pos = max(
+        valid_positions,
+        key=lambda pos: (
+            count_potential_victories(simulate_state(board, pos, current_piece), current_piece),
+            position_score(board, pos, current_piece)
+        )
+    )
+
     simulated = simulate_state(board, best_pos, current_piece)
     updated_remaining = get_remaining_pieces(simulated, current_piece)
     safe_next_pieces = [p for p in updated_remaining if not opponent_can_win(simulated, p)]
@@ -241,56 +249,29 @@ def handle_client(conn):
                 request = json.loads(buffer)
                 buffer = ""
 
-                if request["request"] == "ping":
+                if request.get("request") == "ping":
                     response = {"response": "pong"}
 
-                elif request["request"] == "play":
-                    state = request["state"]
-                    print("[DEBUG] Plateau actuel :", state["board"])
-                    print("[DEBUG] Pièce à jouer  :", state["piece"])
-                    move = choose_move(state)
+                elif request.get("request") == "play":
+                    try:
+                        move = choose_move(request["state"])
+                        response = {"response": "move", "move": move}
+                    except Exception:
+                        # En cas d’erreur, on abandonne
+                        response = {"response": "giveup"}
 
-                    #vérification automatique du move proposé
-                    board = state["board"]
-                    used_pieces = [p for p in board if p is not None]
-                    all_available_positions = get_valid_positions(board)
-                    errors = []
-
-                    if move["piece"] is not None:
-                        if move["piece"] not in ALL_PIECES:
-                            errors.append(f"Pièce '{move['piece']}' non reconnue")
-                        if move["piece"] in used_pieces:
-                            errors.append(f"Pièce '{move['piece']}' déjà utilisée")
-
-                    if move["pos"] is not None:
-                        if move["pos"] not in all_available_positions:
-                            errors.append(f"Position {move['pos']} invalide")
-
-                    if errors:
-                        print("Erreur move", move)
-                        for err in errors:
-                            print("Erreur suivante :", err)
-
-                    response = {
-                        "response": "move",
-                        "move": move,
-                        "message": move.get("message", "Coup joué")
-                    }
-
-                elif request["request"] == "give_up":
-                    response = {
-                        "response": "give_up",
-                        "message": "J'abandonne..."
-                    }
+                elif request.get("request") == "giveup":
+                    response = {"response": "giveup"}
 
                 else:
-                    response = {"response": "error", "error": "Je comprends pas bro"}
+                    response = {"response": "error", "error": "unknown request"}
 
+                # Envoi unique de la réponse
                 conn.sendall((json.dumps(response) + "\n").encode())
 
             except json.JSONDecodeError:
+                # JSON incomplet, on attend la suite
                 continue
-
 
 #serveur tcp pour écouter les requetes du serveur
 def start_tcp_server():
@@ -316,12 +297,14 @@ def subscribe_to_main_server():
 
     #connexion TCP vers le serveur d’inscription
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect((IpServeur, 3000)) 
-        sock.sendall((json.dumps(data) + '\n').encode())
-
-        #afficher la réponse du serveur
-        response = sock.recv(1024).decode()
-        print("[INSCRIPTION]", response)
+        sock.connect((IpServeur, 3000))
+        sock.sendall((json.dumps(data) + "\n").encode())
+        raw = sock.recv(1024).decode()
+        reply = json.loads(raw)
+        if reply.get("response") != "ok":
+            print(f"[SUBSCRIBE ERROR] {reply.get('error')}")
+            return
+        print("[INSCRIPTION] ok")
 
 if __name__ == "__main__":
     print("[CLIENT] Démarrage client...")
