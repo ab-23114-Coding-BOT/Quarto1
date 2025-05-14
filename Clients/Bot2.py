@@ -4,11 +4,11 @@ import json
 import random
 
 HOST = "0.0.0.0"
-PORT = 9976
+PORT = 1234
 IpServeur = "192.168.129.13"
 
-TEAM_NAME = "P"
-MATRICULES = ["23105", "23114"]
+TEAM_NAME = "P2"
+MATRICULES = ["111", "0000"]
 
 ALL_PIECES = [
     "BDEC","BDEP","BDFC","BDFP",
