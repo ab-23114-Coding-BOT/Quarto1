@@ -46,5 +46,5 @@ Ces pièces sont placées sur un plateau 4x4 et le but est donc de pouvoir align
 
 ## Auteur
 
-[Chouaa Mohamed - 23105]
-[Bekhakh Abdeljalil – 23114]
+- [Chouaa Mohamed - 23105]
+- [Bekhakh Abdeljalil – 23114]
