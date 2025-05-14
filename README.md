@@ -11,6 +11,7 @@ Quarto est un jeu de société stratégique contenant 16 pièces différentes, a
 - Rond ou carré
 - Creux ou plein
 - Petit ou grand
+
 Ces pièces sont placées sur un plateau 4x4 et le but est donc de pouvoir aligner 4 pièces (que ce soit en diagonal, horizontal ou vertical) partageant au moins un attribut commun. La particularité en plus de ce jeu est qu’après avoir joué un tour, la pièce suivante de l’adversaire doit être choisie par le joueur.
 
 ## Stratégie de l’IA
