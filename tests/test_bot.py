@@ -1,54 +1,94 @@
-import random
-from Clients.Bot import get_valid_positions, get_remaining_pieces, choose_move
+import pytest
+from Clients.Bot import (
+    get_rows, get_columns, get_diagonals,
+    get_valid_positions, has_common_attribute,
+    creates_victory, count_potential_victories,
+    blocks_opponent_win, get_remaining_pieces,
+    position_score, is_bad_gift, opponent_can_win,
+    simulate_state, evaluate_board
+)
 
-ALL_PIECES = [
-    "BDEC","BDEP","BDFC","BDFP",
-    "BLEC","BLEP","BLFC","BLFP",
-    "SDEC","SDEP","SDFC","SDFP",
-    "SLEC","SLEP","SLFC","SLFP"
-]
+# Un plateau vide
+EMPTY = [None] * 16
 
-def test_get_valid_positions_all_empty():
-    board = [None, None, None, None]
-    assert get_valid_positions(board) == [0, 1, 2, 3]
+# Un exemple de ligne gagnante (tous partagent le 1er attribut)
+WIN_LINE = ["BDEC", "BDEP", "BDFC", "BDFP"]
 
-def test_get_valid_positions_some_filled():
-    board = ["X", None, "Y", None]
-    assert get_valid_positions(board) == [1, 3]
+@pytest.mark.parametrize("board, expected", [
+    (list(range(16)), [list(range(4)), list(range(4,8)), list(range(8,12)), list(range(12,16))]),
+])
+def test_get_rows(board, expected):
+    assert get_rows(board) == expected
 
-def test_get_valid_positions_no_empty():
-    board = ["A", "B", "C", "D"]
-    assert get_valid_positions(board) == []
+def test_get_columns():
+    board = list(range(16))
+    cols = get_columns(board)
+    assert cols[0] == [0,4,8,12]
+    assert cols[3] == [3,7,11,15]
 
-def test_get_remaining_pieces_no_current():
-    board = [None, "BDEC", None]
-    expected = [p for p in ALL_PIECES if p != "BDEC"]
-    result = get_remaining_pieces(board, None)
-    assert sorted(result) == sorted(expected)
+def test_get_diagonals():
+    board = list(range(16))
+    diags = get_diagonals(board)
+    assert diags[0] == [0,5,10,15]
+    assert diags[1] == [3,6,9,12]
 
-def test_get_remaining_pieces_with_current_already_used():
-    board = ["BDEP", "BDFC"]
-    # current_piece déjà dans board = on ne l'ajoute pas deux fois
-    expected = [p for p in ALL_PIECES if p not in ["BDEP", "BDFC"]]
-    result = get_remaining_pieces(board, "BDEP")
-    assert sorted(result) == sorted(expected)
+def test_get_valid_positions():
+    b = EMPTY.copy()
+    b[5] = "foo"
+    assert 5 not in get_valid_positions(b)
+    assert len(get_valid_positions(b)) == 15
 
-def test_choose_move_gives_piece_when_none():
-    random.seed(0)  # pour reproductibilité
-    state = {"board": [None, None, None, None], "piece": None}
-    move = choose_move(state)
-    assert move["pos"] is None
-    assert move["piece"] in get_remaining_pieces(state["board"], None)
+def test_has_common_attribute_true():
+    assert has_common_attribute(WIN_LINE)
 
-def test_choose_move_gives_up_when_full():
-    state = {"board": ["X", "Y", "Z"], "piece": "BDEC"}
-    move = choose_move(state)
-    assert move.get("response") == "give_up"
+def test_creates_victory_row():
+    board = EMPTY.copy()
+    for idx, p in zip([0,1,2], WIN_LINE[:3]):
+        board[idx] = p
+    assert creates_victory(board, 3, WIN_LINE[3])
 
-def test_choose_move_random_play():
-    random.seed(1)
-    board = [None, "A", None]
-    state = {"board": board, "piece": "BDEP"}
-    move = choose_move(state)
-    assert move["pos"] in get_valid_positions(board)
-    assert move["piece"] in get_remaining_pieces(board, "BDEP")
+def test_count_potential_victories():
+    board = EMPTY.copy()
+    for i,p in enumerate(WIN_LINE[:3]):
+        board[i] = p
+    assert count_potential_victories(board, WIN_LINE[3]) == 1
+
+def test_blocks_opponent_win():
+    board = EMPTY.copy()
+    for i,p in enumerate(WIN_LINE[:3]):
+        board[i] = p
+    assert blocks_opponent_win(board, WIN_LINE[3]) == 3
+
+def test_get_remaining_pieces():
+    board = EMPTY.copy()
+    board[0] = "BDEC"
+    rem = get_remaining_pieces(board)
+    assert "BDEC" not in rem
+    rem2 = get_remaining_pieces(board, "BLEC")
+    assert "BLEC" not in rem2
+
+def test_position_score_basic():
+    board = EMPTY.copy()
+    assert position_score(board, 0, "BDEC") >= 0
+
+def test_is_bad_gift_and_opponent_can_win():
+    board = EMPTY.copy()
+    for i,p in enumerate(WIN_LINE[:3]):
+        board[i] = p
+    assert is_bad_gift(board, WIN_LINE[3])
+    assert opponent_can_win(board, WIN_LINE[3])
+
+def test_simulate_state():
+    board = EMPTY.copy()
+    sim = simulate_state(board, 7, "BDEC")
+    assert sim[7] == "BDEC"
+    assert board[7] is None
+
+def test_evaluate_board_immediate_win():
+    board = EMPTY.copy()
+    for i,p in enumerate(WIN_LINE):
+        board[i] = p
+    assert evaluate_board(board, "BLFP") >= 1000
+
+if __name__ == "__main__":
+    pytest.main()
