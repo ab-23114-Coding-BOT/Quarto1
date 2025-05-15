@@ -33,7 +33,7 @@ def get_valid_positions(board): #sert à récupérer les positions vides sur le 
     return [i for i, cell in enumerate(board) if cell is None]
 
 def has_common_attribute(pieces): #retourne true si les 4 pièces ont un attribut en commun
-    if len(pieces) != 4 or any(p is None for p in pieces):
+    if len(pieces) != 4 or any(p is None or not isinstance(p, str) or len(p) != 4 for p in pieces):
         return False
 
     for i in range(4):
@@ -209,7 +209,7 @@ def evaluate_board(board, current_piece): #donne un score en fct des meilleures 
     lines = get_rows(board) + get_columns(board) + get_diagonals(board)
 
     for line in lines:
-        pieces = [p for p in line if p]
+        pieces = [p for p in line if p is not None]
         if len(pieces) == 4 and has_common_attribute(pieces):
             score += 1000  #quarto immédiat
         elif len(pieces) == 3 and line.count(None) == 1:
@@ -226,7 +226,7 @@ def evaluate_board(board, current_piece): #donne un score en fct des meilleures 
         elif len(pieces) == 1:
             score += 1  # +1 pour une pièce
 
-    if opponent_can_win(board, current_piece):
+    if opponent_can_win(board, current_piece) and score == 0:
         score -= 200  #grosse pénalité si la pièce permet à l’adversaire de gagner
 
     return score
