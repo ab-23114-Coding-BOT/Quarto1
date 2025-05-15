@@ -4,7 +4,7 @@ import json
 import random        
 
 HOST = "0.0.0.0"     
-PORT = 1234          
+PORT = 2345          
 IpServeur = "192.168.129.13"
 
 TEAM_NAME = "BOTKZ"
@@ -41,11 +41,33 @@ def has_common_attribute(pieces): #retourne true si les 4 pièces ont un attribu
             return True
     return False
 
-def creates_victory(board, pos, piece): #vérifie si poser une pièce à une certaine position donne une victoire
+def creates_victory(board, pos, piece):
     simulated = board.copy()
     simulated[pos] = piece
-    lines = get_rows(simulated) + get_columns(simulated) + get_diagonals(simulated)
-    return any(None not in line and has_common_attribute(line) for line in lines)
+
+    row_start = (pos // 4) * 4
+    row = simulated[row_start : row_start + 4]
+    if None not in row and has_common_attribute(row):
+        return True
+
+    col_idx = pos % 4
+    col = [simulated[col_idx + 4*i] for i in range(4)]
+    if None not in col and has_common_attribute(col):
+        return True
+
+    diag1 = [0, 5, 10, 15]
+    if pos in diag1:
+        line = [simulated[i] for i in diag1]
+        if None not in line and has_common_attribute(line):
+            return True
+
+    diag2 = [3, 6, 9, 12]
+    if pos in diag2:
+        line = [simulated[i] for i in diag2]
+        if None not in line and has_common_attribute(line):
+            return True
+
+    return False
 
 def count_potential_victories(board, piece): #nbr de lignes où la pièce peut faire un Quarto immédiat
     count = 0
@@ -141,6 +163,21 @@ def choose_move(state): #choisir un coup valide en fonction des choix
         safe = [p for p in rem if not opponent_can_win(sim, p)]
         gift = safe[0] if safe else (rem[0] if rem else None)
         return {"pos": pos0, "piece": gift, "message": "Fork !"}
+    
+        # Si peu de cases restantes, on active Minimax
+    if len(valid_positions) <= 6:
+        depth = 3
+        score, best = minimax(board, current_piece,
+                              depth, True,
+                              float('-inf'),
+                              float('inf'))
+        if best:
+            pos, next_piece = best
+            return {
+                "pos": pos,
+                "piece": next_piece,
+                "message": f"Minimax (prof. {depth})"
+            }
 
     best_pos = max(
         valid_positions,
